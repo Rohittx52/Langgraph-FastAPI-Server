@@ -59,6 +59,30 @@ langgraph-server/
 ├── requirements.txt            # Dependencies
 └── README.md                   # Documentation
 ```
+## Architecture Overview
+
+The Langgraph FastAPI Server is organized using a clean modular structure to ensure scalability, maintainability, and asynchronous performance.
+
+- app/ – The core application module containing API routes, business logic, database models, and services.
+
+- api/ – Contains all FastAPI route definitions for runs, streams, and internal endpoints.
+
+- models/ – Defines SQLAlchemy ORM models for persistent entities such as runs and workflows.
+
+- schemas/ – Pydantic models for data validation, serialization, and API communication.
+
+- services/ – Core workflow logic, orchestration, and artifact/state management modules.
+
+- utils/ – Helper utilities for async queues, config handling, logging, and rate limiting.
+
+- data/ – Contains local artifacts, checkpointed states, and the SQLite database file.
+
+- .env – Stores environment variables such as API keys, database URLs, etc.
+
+- requirements.txt – Lists all Python dependencies required to run the server.
+
+- README.md – Documentation explaining architecture, setup, and usage.
+
 ## Features and Utilities
 - Utility	Description
 - Run Manager	Creates, tracks, and updates workflow runs
@@ -76,20 +100,6 @@ langgraph-server/
 - GET	/api/runs/{id}	Get run details (if implemented)
 - GET	/api/monitoring/health	Health check
 - WS	/api/ws/{run_id}	WebSocket stream for real-time run updates
-
-## Database
-- Backend: SQLite (aiosqlite driver)
-
-- ORM: SQLAlchemy 2.x async
-
-- Models defined in app/models/run.py
-
-- Automatically initialized at startup.
-
-- You can migrate to PostgreSQL or MySQL by editing:
-- DATABASE_URL = "sqlite+aiosqlite:///./data/fastgraph.db"
-- to
-- DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/dbname"
 
 ## Installation & Setup
 1. Create and activate a virtual environment
@@ -114,12 +124,12 @@ ReDoc → http://127.0.0.1:8000/redoc
 ## Example Workflow
 
 1️⃣ POST /api/runs/
-
+```
 {
   "name": "test-run-1",
   "payload": { "input": "Hello World" }
 }
-
+```
 
 2️⃣ The server:
 
@@ -132,7 +142,7 @@ Broadcasts started → node_update → completed
 Updates the run status to "completed"
 
 3️⃣ GET /api/runs/
-
+```
 [
   {
     "id": "uuid",
@@ -141,6 +151,7 @@ Updates the run status to "completed"
     "result": {"artifact": "uuid_result.json"}
   }
 ]
+```
 
 ## Tech Stack
 
