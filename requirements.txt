@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy>=1.4
+alembic
+pydantic
+python-dotenv
+aioredis
+aiofiles
+psycopg[binary]     # optional if you use Postgres
+python-multipart
