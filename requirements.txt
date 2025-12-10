@@ -1,10 +1,12 @@
 fastapi
 uvicorn[standard]
-SQLAlchemy>=1.4
-alembic
-pydantic
+SQLAlchemy>=2.0
+aiosqlite          
+alembic            
+pydantic>=2.0
+pydantic-settings   
 python-dotenv
-aioredis
-aiofiles
-psycopg[binary]     # optional if you use Postgres
-python-multipart
+aiofiles         
+aioredis       
+python-multipart    
+psycopg[binary]    
