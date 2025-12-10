@@ -1,13 +1,19 @@
 from fastapi import APIRouter
-from .endpoints import runs, artifacts, workflows, websocket, monitoring
-from app.api import runs 
+from app.api.endpoints import runs as runs_endpoint
+from app.api.endpoints import artifacts as artifacts_endpoint
+from app.api.endpoints import workflows as workflows_endpoint
+from app.api.endpoints import websocket as websocket_endpoint
+from app.api.endpoints import monitoring as monitoring_endpoint
 
-api_router = APIRouter() 
+api_router = APIRouter()
 
-api_router.include_router(runs.router, prefix="/runs", tags=["runs"])
-api_router.include_router(artifacts.router, prefix="/artifacts", tags=["artifacts"])
-api_router.include_router(workflows.router, prefix="/workflows", tags=["workflows"])
-api_router.include_router(websocket.router, prefix="/ws", tags=["websocket"])
-api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
-
-
+for mod, prefix, tag in [
+    (runs_endpoint, "/runs", ["runs"]),
+    (artifacts_endpoint, "/artifacts", ["artifacts"]),
+    (workflows_endpoint, "/workflows", ["workflows"]),
+    (websocket_endpoint, "/ws", ["websocket"]),
+    (monitoring_endpoint, "/monitoring", ["monitoring"]),
+]:
+    if not hasattr(mod, "router"):
+        raise ImportError(f"Module {mod.__name__!r} does not expose 'router'. Check {mod.__file__}")
+    api_router.include_router(getattr(mod, "router"), prefix=prefix, tags=tag)
