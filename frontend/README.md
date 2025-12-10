@@ -1,296 +1,306 @@
-FastGraph Server — Async Workflow Engine (LangGraph-style)
+# FastGraph Server
 
-A modular, production-ready FastAPI + Async backend that replicates core LangGraph server features.
-Supports async task execution, run tracking, artifact storage, checkpointing, state management, and real-time WebSocket streaming — paired with a clean React + Tailwind dashboard frontend.
+A production‑ready asynchronous workflow execution engine inspired by LangGraph, built using FastAPI with real‑time WebSocket streaming, persistent storage, modular services, and a modern React dashboard.
 
-🚀 Key Features
-Backend
+---
 
-Async workflow execution via custom task queue
+## 1. Purpose
 
-Run Manager (create, update, list, fetch run by ID)
+FastGraph provides a complete backend system for managing and executing stateful workflows. It supports background execution, live event streaming, artifacts, checkpoints, and run lifecycle tracking.
 
-State Store for saving intermediate workflow states
+This system is ideal for ML pipelines, automation engines, workflow orchestration, and LangGraph‑style stepwise execution.
 
-Checkpoint Store for step-level snapshots
+---
 
-Artifact Store for final outputs
+## 2. System Architecture (High‑Level)
 
-Real-time WebSocket event streaming
+The platform is structured into clean, independent layers:
 
-Async SQLAlchemy (SQLite) persistence
+```
+Frontend (React Dashboard)
+     │              \
+     │ REST API       WebSocket Stream
+     ▼                 ▼
+API Layer (FastAPI Routers)
+     ▼
+Service Layer (Run Manager, Workflow Engine, State Stores)
+     ▼
+Persistence Layer (SQLite DB + Filesystem Storage)
+```
 
-Clean service-based architecture
+---
 
-Frontend
+## 3. Full Workflow Diagram
 
-Fully functional dashboard built using React + Tailwind
+Below is a structured diagram showing how a run flows through the system.
 
-Live WebSocket feed for run updates
+```
+User → POST /api/runs → Run Created in DB → TaskQueue schedules workflow
+     → _execute_workflow(run_id, payload)
+         → Save state
+         → Save checkpoint
+         → Broadcast WS events
+         → Create artifact
+         → Update run status
+     → Frontend receives live updates over WebSocket
+```
 
-Artifact download + run details
+A more detailed flow:
 
-Modern UI with dark theme
+```
+┌──────────────┐         POST /api/runs        ┌──────────────────┐
+│   Frontend    │ ───────────────────────────▶ │    Runs API       │
+└──────────────┘                               └──────────────────┘
+                                                      │
+                                                      ▼
+                                        ┌────────────────────────┐
+                                        │      Run Manager       │
+                                        │ (create DB entry)      │
+                                        └────────────────────────┘
+                                                      │
+                                                      ▼
+                                        ┌────────────────────────┐
+                                        │     SQLite Database    │
+                                        └────────────────────────┘
+                                                      │
+                                                      ▼
+                                        ┌────────────────────────┐
+                                        │      Task Queue        │
+                                        │ (async background job) │
+                                        └────────────────────────┘
+                                                      │
+                                                      ▼
+                                ┌────────────────────────────────────┐
+                                │       _execute_workflow()          │
+                                │  - save state                      │
+                                │  - save checkpoints                │
+                                │  - create artifact                 │
+                                │  - status transitions              │
+                                └────────────────────────────────────┘
+                                                      │
+                        ┌──────────────────────────────┴──────────────────────────────┐
+                        ▼                                                             ▼
+             ┌────────────────────────┐                                  ┌──────────────────────────┐
+             │ WebSocket Stream Mgr   │                                  │ Final updated DB entry   │
+             │ broadcast live events  │                                  │ status = completed       │
+             └────────────────────────┘                                  └──────────────────────────┘
+                        │
+                        ▼
+             ┌────────────────────────┐
+             │ Frontend Console View │
+             │ real‑time logs/events │
+             └────────────────────────┘
+```
 
-📁 Project Structure
+---
+
+## 4. Repository Structure
+
+```
 langgraph-server/
 │
 ├── app/
 │   ├── main.py                 # FastAPI app entrypoint
-│   ├── database.py             # SQLAlchemy + SQLite async setup
+│   ├── database.py             # Async SQLAlchemy setup
+│   │
 │   ├── api/
-│   │   ├── main.py             # Root API router (aggregates endpoints)
-│   │   ├── endpoints/
-│   │   │   ├── runs.py         # Run creation, list, fetch-by-id
-│   │   │   ├── artifacts.py    # Artifact retrieval
-│   │   │   ├── websocket.py    # WS for live updates
-│   │   │   ├── workflows.py    # (optional future workflows)
-│   │   │   └── monitoring.py   # Health check
+│   │   ├── main.py             # Central API router
+│   │   └── endpoints/
+│   │       ├── runs.py         # Run creation, listing, details
+│   │       ├── artifacts.py    # Artifact download
+│   │       ├── websocket.py    # Live WebSocket events
+│   │       ├── workflows.py    # Workflow registry (optional)
+│   │       └── monitoring.py   # Health monitoring
 │   │
 │   ├── models/
 │   │   └── run.py              # ORM model for Run table
+│   │
 │   ├── schemas/
-│   │   └── run.py              # Pydantic schemas
+│   │   └── run.py              # Pydantic request/response models
+│   │
 │   ├── services/
-│   │   ├── run_manager.py      # CRUD operations for runs
-│   │   ├── workflow_service.py # _execute_workflow logic
-│   │   ├── artifact_store.py   # Store final artifacts
-│   │   ├── checkpoint_store.py # Save checkpoints
-│   │   └── state_services.py   # Save run states
+│   │   ├── run_manager.py      # CRUD for runs
+│   │   ├── workflow_service.py # Core workflow logic
+│   │   ├── state_services.py   # State persistence
+│   │   ├── checkpoint_store.py # Checkpoint management
+│   │   ├── artifact_store.py   # Artifact storage handler
+│   │
 │   ├── utils/
-│   │   ├── task_queue.py       # Async background task manager
-│   │   ├── stream_manager.py   # WebSocket broadcaster
-│   │   └── config.py           # App configuration loader
+│   │   ├── task_queue.py       # Async background execution queue
+│   │   ├── stream_manager.py   # WebSocket broadcasting manager
+│   │   └── config.py           # Config helper
+│   │
 │   ├── middleware/
-│   │   ├── logging.py
-│   │   └── rate_limit.py
+│       ├── logging.py          # Request logging
+│       └── rate_limit.py       # Rate limiting
 │
 ├── data/
-│   ├── fastgraph.db            # SQLite DB (auto-created)
-│   ├── artifacts/              # Final result files
-│   ├── checkpoints/            # Intermediate checkpoints
-│   └── states/                 # Persisted state snapshots
+│   ├── fastgraph.db            # SQLite database
+│   ├── artifacts/              # Output artifacts
+│   ├── states/                 # State snapshots
+│   └── checkpoints/            # Checkpoint snapshots
 │
 ├── frontend/                   # React + Tailwind dashboard
-│
 ├── requirements.txt
 ├── .env
 └── README.md
+```
 
-📊 Workflow Diagram (How Everything Works)
+---
 
-This diagram shows the full lifecycle: user request → DB entry → task execution → WebSocket streaming → artifact output.
+## 5. Backend Components (Detailed)
 
-flowchart TD
+### 5.1 API Layer
 
-%% Input
-A[User / Frontend Dashboard] -->|POST /api/runs| B[Runs API]
+Exposes REST endpoints:
 
-%% Run Creation
-B --> C[Run Manager\nCreate Run Entry]
-C -->|Insert into DB| D[(SQLite DB)]
+* `POST /api/runs/` – create a workflow run
+* `GET  /api/runs/` – list all runs
+* `GET  /api/runs/{id}` – get run details
+* `GET  /api/artifacts/{id}` – download artifacts
+* `WS   /api/ws/{run_id}` – live event streaming
+* `GET  /api/monitoring/health` – health status
 
-%% Schedule Workflow
-C -->|Add async task| E[Task Queue]
+### 5.2 Run Manager
 
-%% Background Execution
-E --> F[_execute_workflow(run_id, payload)]
+Handles:
 
-%% Workflow Steps
-F --> G[State Store\nsave state]
-F --> H[Checkpoint Store\nsave checkpoint]
-F --> I[Artifact Store\ncreate artifact]
+* run creation
+* updating status
+* writing final result
+* retrieving runs
 
-%% Updates to DB
-F -->|Update status| D
+### 5.3 Workflow Engine
 
-%% Real-time Streaming
-F -->|Broadcast events| J[WebSocket Stream Manager]
-J --> K[Connected Frontend Clients]
+Responsible for the execution pipeline:
 
-%% Frontend UI
-K --> L[Live Events View]
-D --> M[Runs List / Run Details]
-I --> N[Download Artifact]
+* load payload
+* broadcast start
+* save state
+* save checkpoint
+* run async operations
+* generate artifacts
+* broadcast completion
 
+### 5.4 Task Queue
 
-🔁 Run Lifecycle Explained
-1. User creates a run
+A lightweight asynchronous queue that ensures workflows run in the background without blocking the main app.
 
-Frontend or client sends:
+### 5.5 Stream Manager
 
+Handles:
+
+* WebSocket connections
+* subscribing to run channels
+* pushing live execution logs/events
+
+### 5.6 Storage Systems
+
+* **SQLite DB** → Run metadata
+* **Filesystem** → artifacts, states, checkpoints
+
+---
+
+## 6. API Reference
+
+### Create Run
+
+```
 POST /api/runs/
 {
-  "name": "Test Run",
-  "payload": { "input": "hello" }
+  "name": "test-run",
+  "payload": { "input": "hello world" }
 }
+```
 
-2. Backend creates DB entry
+Response:
 
-Generates UUID
+```
+{ "run_id": "uuid" }
+```
 
-Inserts row into SQLite (status="running")
+### List Runs
 
-Stores metadata
+```
+GET /api/runs/
+```
 
-Returns the run_id
+### WebSocket Events
 
-3. Background workflow starts
+Messages include:
 
-The run is pushed to the async task queue, which executes:
-
-_execute_workflow(run_id, payload)
-
-
-This function performs:
-
-broadcast "started"
-
-simulate steps
-
-save state + checkpoint
-
-generate artifact
-
-update DB status → "completed"
-
-broadcast "completed"
-
-4. Real-time updates through WebSocket
-
-Frontend listens at:
-
-ws://localhost:8000/api/ws/{run_id}
-
-
-Receives events like:
-
+```
 { "event": "started" }
 { "event": "node_update", "node": "parse" }
 { "event": "completed" }
+```
 
-5. User downloads final artifact
+---
 
-Artifact stored in:
+## 7. Frontend Dashboard
 
-data/artifacts/{runid_hash_result.json}
+Located in `/frontend/`, includes:
 
+* Run creation form
+* Live run history
+* Real‑time console output
+* Artifact download interface
 
-API:
+Run with:
 
-GET /api/artifacts/{artifact_id}
-
-⚙️ Installation & Setup
-1. Create virtual environment
-python -m venv venv
-source venv/bin/activate     # Linux/Mac
-venv\Scripts\activate        # Windows
-
-2. Install dependencies
-pip install -r requirements.txt
-
-3. Initialize database
-python -m app.init_db
-
-4. Start FastAPI server
-uvicorn app.main:app --reload --port 8000
-
-
-Backend available at:
-
-Swagger UI → http://127.0.0.1:8000/docs
-
-ReDoc → http://127.0.0.1:8000/redoc
-
-🎨 Frontend Setup (React + Tailwind Dashboard)
-cd frontend
+```
 npm install
 npm run dev
+```
 
+---
 
-Default:
+## 8. Running the Backend Locally
 
-http://localhost:5173
+### Step 1 – Create environment
 
+```
+python -m venv venv
+venv\Scripts\activate
+```
 
-The dashboard supports:
+### Step 2 – Install dependencies
 
-Create runs
+```
+pip install -r requirements.txt
+```
 
-View live events
+### Step 3 – Start server
 
-WebSocket connection status
+```
+uvicorn app.main:app --reload --port 8000
+```
 
-Download artifacts
+### Access documentation
 
-Inspect metadata + results
+* Swagger → [http://localhost:8000/docs](http://localhost:8000/docs)
+* ReDoc   → [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-📡 API Documentation
-Create Run
-POST /api/runs/
+---
 
+## 9. Test Script
 
-Body:
+A small smoke test:
 
-{
-  "name": "run-123",
-  "payload": { "input": "hello" }
-}
-
-List Runs
-GET /api/runs/
-
-Get Run by ID
-GET /api/runs/{run_id}
-
-Stream Events
-WS /api/ws/{run_id}
-
-Download Artifact
-GET /api/artifacts/{artifact_id}
-
-🧪 Testing
-Using Python script
+```
 python test_run.py
+```
 
+Example output:
 
-Example Output:
-
+```
 create: 200 {"run_id": "..."}
-0 200 {"id": "...", "status": "running"}
-found run: {...}
+found run: { "status": "running" }
+```
 
-Using PowerShell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/runs/" `
-  -Method POST -ContentType "application/json" `
-  -Body '{"name":"smoke","payload":{"input":"hello"}}'
+---
 
-🛠️ Tech Stack
-
-FastAPI (ASGI)
-
-Async SQLAlchemy + aiosqlite
-
-asyncio task queue
-
-WebSockets
-
-React + Tailwind frontend
-
-SQLite persistence layer
-
-📌 Future Enhancements
-
-Authentication (API keys / JWT)
-
-Persistent distributed queue (Redis / Celery)
-
-Visual workflow editor
-
-Cloud artifact storage (S3, GCS)
-
-Alembic migrations
-
-👤 Author
-
+## 11. Author
 Rohit Ranjan Kumar
+
+---
