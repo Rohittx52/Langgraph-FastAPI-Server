@@ -1,109 +1,157 @@
-LangGraph-FastAPI Server
+# 🚀 LangGraph-FastAPI Server
 
-A fully modular, production-ready FastAPI backend that replicates LangGraph server utilities — providing asynchronous workflow execution, real-time event streaming, persistent storage, and clean service-oriented architecture.
+<div align="center">
 
-This project is built for advanced workflow orchestration and can serve as a backend foundation for AI agents, LangGraph-like systems, automation frameworks, and distributed pipelines.
+![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-active-success.svg)
 
-High-Level Architecture Diagram
-flowchart TD
+**A fully modular, production-ready FastAPI backend that replicates LangGraph server utilities**
 
-    %% User Layer
-    A[User Creates Run\nvia Frontend Dashboard] --> B[Frontend Sends POST /api/runs]
+*Providing asynchronous workflow execution, real-time event streaming, persistent storage, and clean service-oriented architecture*
 
-    %% API Gateway
-    B --> C[FastAPI Router\n/api/runs]
+[Features](#-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api-endpoints) • [Roadmap](#-roadmap)
 
-    %% Run Creation
-    C --> D[Run Manager\n• Create Run ID\n• Save to DB\n• Set status=pending]
+</div>
 
-    D --> E[Task Queue\nAsync Worker]
-    E --> F[Workflow Engine\n_Execute Workflow_]
+---
 
-    %% Workflow Execution Phases
-    F --> G[Node Execution\n(parse / compute / logic)]
-    G --> H[Checkpoint Store\nSave step state]
+## 📋 Overview
 
-    F --> I[Artifact Store\nStore final outputs]
+This project recreates the **LangGraph server** behavior using FastAPI, delivering a cleaner architecture with a fully async execution pipeline. Built for advanced workflow orchestration, it serves as a backend foundation for:
 
-    %% Database / State writes
-    H --> J[(SQLite\nfastgraph.db)]
-    I --> J
+- 🤖 **AI Agent Systems**
+- 🔄 **LangGraph-like Workflows**
+- ⚙️ **Automation Frameworks**
+- 🌐 **Distributed Pipelines**
 
-    %% Live WebSocket Feeds
-    F --> K[Stream Manager\nBroadcast Events]
-    K --> L[Frontend WebSocket Listener\n/ws/{run_id}]
+---
 
-    %% Frontend UI updates
-    L --> M[Dashboard Updates:\n• Status\n• Events\n• Result\n• Artifacts]
+## ✨ Features
 
-    %% Completion
-    F --> N[Set Run Status = completed]
-    N --> M
+| Feature | Description |
+|---------|-------------|
+| 🔄 **Async Workflow Execution** | Powered by custom in-memory task queue |
+| 📊 **Run Management** | Create, update, list, and track workflow runs |
+| 💾 **Persistent Artifacts** | Store workflow outputs as JSON/files |
+| 📍 **Checkpointing** | Save intermediate workflow steps |
+| 🗂️ **State Management** | Maintain workflow state throughout execution |
+| 🌐 **WebSocket Streaming** | Real-time event updates to dashboard |
+| 🗄️ **Async SQLAlchemy ORM** | SQLite + aiosqlite backend |
+| 🏗️ **Modular Architecture** | Clean separation: API → Services → Utils → Models |
 
-Workflow Execution Diagram
+---
+
+## 🏛️ Architecture
+
+### System Architecture Diagram
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffedce', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f4f4f4'}}}%%
+graph TD
+    %% Define Nodes
+    Client[Client<br>Swagger / Frontend / curl]
+    
+    subgraph API_Service ["API Service (FastAPI)"]
+        Router[FastAPI Router<br>POST /api/runs/]
+        Pydantic(Pydantic Validation)
+        Manager[Run Manager]
+        WS[WebSocket Endpoint<br>/api/ws/{run_id}]
+    end
+    
+    DB[(Database)]
+    Queue>Task Queue<br>(async worker)]
+    Artifacts[[Artifact Store<br>S3 / Blob Storage]]
+
+    %% Main Request Flow
+    Client -- 1. POST request --> Router
+    Router --> Pydantic
+    Pydantic -- Validated --> Manager
+    Manager -- 2. Insert run record<br>(status=running) --> DB
+    Manager -- 3. Enqueue Job --> Queue
+
+    %% Async Execution Flow
+    Queue -- 4. Execute Workflow<br>& Emit Events --> WS
+    WS -.- 5. Stream Updates<br>(started → node_update → completed) .-> Client
+
+    %% Completion Flow
+    Queue -- 6. Save result JSON --> Artifacts
+    Artifacts -.->|Link to artifact| Queue
+    Queue -- 7. Final Update<br>(status=completed, result link) --> DB
+
+    %% Styling
+    classDef storage fill:#e1edff,stroke:#4a7ebb,stroke-width:2px;
+    classDef async fill:#e8d4ff,stroke:#8a4abb,stroke-width:2px;
+    class DB,Artifacts storage;
+    class Queue,WS async;
+```
+
+### Workflow Execution Flow
+
+```
 USER → Create Run (API)
-        |
+        │
         ▼
 FastGraph Backend
-        |
-        |-- 1. RunManager.create() → save run to DB
-        |
-        |-- 2. TaskQueue.add_task() → schedule async workflow
-        |
-        |-- 3. WS: broadcast "started"
-        |
-        |-- 4. Workflow steps execute:
-        |        parse → analyze → save states/checkpoints
-        |
-        |-- 5. ArtifactService.save() → result.json
-        |
-        |-- 6. RunManager.update(status="completed")
-        |
-        |-- 7. WS: broadcast "completed"
-        |
+        │
+        ├─ 1. RunManager.create() → save run to DB
+        │
+        ├─ 2. TaskQueue.add_task() → schedule async workflow
+        │
+        ├─ 3. WS: broadcast "started"
+        │
+        ├─ 4. Workflow steps execute:
+        │        parse → analyze → save states/checkpoints
+        │
+        ├─ 5. ArtifactService.save() → result.json
+        │
+        ├─ 6. RunManager.update(status="completed")
+        │
+        └─ 7. WS: broadcast "completed"
+        │
         ▼
 FRONTEND: Shows real-time logs, steps, result, artifacts
+```
 
-Overview
+---
 
-This project recreates the LangGraph server behavior using FastAPI, but with a cleaner architecture and fully async execution pipeline.
+## 📁 Project Structure
 
-Core Capabilities
-Feature	Description
-Async workflow execution	Powered by a custom in-memory task queue
-Run management	Create, update, list, and track workflow runs
-Persistent artifacts	Store workflow outputs as JSON/files
-Checkpointing	Save intermediate workflow steps
-State management	Maintain workflow state throughout execution
-WebSocket streaming	Real-time event updates to the dashboard
-Async SQLAlchemy ORM	SQLite + aiosqlite backend
-Modular architecture	Clean separation of API, services, utils, models
-Project Structure
+```
 langgraph-server/
 ├── app/
 │   ├── main.py                    # FastAPI initialization
 │   ├── database.py                # Async DB setup
+│   │
 │   ├── api/
 │   │   ├── main.py                # Router aggregator
-│   │   ├── runs.py                # Run creation/listing
-│   │   ├── stream.py              # WebSocket connections
+│   │   ├── endpoints/
+│   │   │   ├── runs.py            # Run creation/listing
+│   │   │   └── ...
+│   │   └── stream.py              # WebSocket connections
+│   │
 │   ├── models/
 │   │   └── run.py                 # SQLAlchemy ORM model
+│   │
 │   ├── schemas/
 │   │   └── run.py                 # Pydantic validation models
+│   │
 │   ├── services/
 │   │   ├── run_manager.py         # CRUD ops for runs
 │   │   ├── workflow_service.py    # Main workflow logic
 │   │   ├── artifact_store.py      # Save result artifacts
 │   │   ├── checkpoint_store.py    # Save execution checkpoints
-│   │   ├── state_services.py      # Maintain run state
+│   │   └── state_services.py      # Maintain run state
+│   │
 │   ├── utils/
 │   │   ├── task_queue.py          # Async task queue
 │   │   ├── stream_manager.py      # Manage WebSocket clients
-│   │   └── config.py              # Configuration helper
-│   ├── middleware/
-│   │   ├── logging.py             # Request logging
-│   │   └── rate_limit.py          # Optional rate limiting
+│   │   └── logger.py              # Logging utilities
+│   │
+│   └── middleware/
+│       ├── logging.py             # Request logging
+│       └── rate_limit.py          # Optional rate limiting
 │
 ├── data/
 │   ├── fastgraph.db               # SQLite database
@@ -112,111 +160,216 @@ langgraph-server/
 │   └── states/                    # State store
 │
 ├── frontend/                      # React dashboard (Vite + Tailwind)
-│
 ├── .env
 ├── requirements.txt
-└── README.md
+└── test_run.py
+```
 
-API Endpoints
-Method	Endpoint	Description
-POST	/api/runs/	Create a new workflow run
-GET	/api/runs/	List all runs
-GET	/api/runs/{id}	Retrieve a specific run
-GET	/api/monitoring/health	Health check
-WS	/api/ws/{run_id}	Real-time event updates
-Installation & Setup
-1. Create a virtual environment
+---
+
+## 🚀 Installation
+
+### Prerequisites
+
+- **Python 3.12+**
+- **Node.js 18+** (for frontend)
+- **Git**
+
+### Backend Setup
+
+```powershell
+# Clone the repository
+git clone https://github.com/OrydleAI/Langgraph-FastAPI-Server.git
+cd Langgraph-FastAPI-Server/langgraph-server
+
+# Create virtual environment
 python -m venv venv
 venv\Scripts\activate     # Windows
+source venv/bin/activate  # Linux/Mac
 
-2. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-3. Initialize the SQLite database
+# Initialize database
 python -m app.init_db
 
-4. Start FastAPI server
-uvicorn app.main:app --reload --port 8000
+# Start FastAPI server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-5. Open API docs
+### Frontend Setup
 
-Swagger:
-http://127.0.0.1:8000/docs
+See [Frontend README](frontend/README.md) for detailed instructions.
 
-ReDoc:
-http://127.0.0.1:8000/redoc
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-Example Workflow (End-to-End)
-1️⃣ Create a Run
+---
 
-POST request:
+## 📖 Usage
 
+### Access the Application
+
+| Service | URL |
+|---------|-----|
+| 🌐 **Frontend Dashboard** | http://localhost:5173 |
+| 📚 **API Swagger Docs** | http://127.0.0.1:8000/docs |
+| 📖 **API ReDoc** | http://127.0.0.1:8000/redoc |
+| ❤️ **Health Check** | http://127.0.0.1:8000/api/monitoring/health |
+
+### Example Workflow (End-to-End)
+
+#### 1️⃣ Create a Run
+
+**POST** `http://127.0.0.1:8000/api/runs/`
+
+```json
 {
   "name": "test-run-1",
   "payload": { "input": "Hello World" }
 }
+```
 
-2️⃣ What Backend Does
+**Response:**
 
-saves new run to DB
+```json
+{
+  "run_id": "uuid-here"
+}
+```
 
-schedules workflow
+#### 2️⃣ Backend Processing
 
-streams events (started, node_update, completed)
+The backend automatically:
 
-writes artifact to /data/artifacts/
+1. ✅ Saves new run to database
+2. ⚡ Schedules workflow execution
+3. 📡 Streams events: `started` → `node_update` → `completed`
+4. 💾 Writes artifact to `/data/artifacts/`
+5. ✨ Updates run status to `completed`
 
-updates run status → completed
+#### 3️⃣ Retrieve Runs
 
-3️⃣ Get Run List
+**GET** `http://127.0.0.1:8000/api/runs/`
+
+```json
 [
   {
-    "id": "uuid",
+    "id": "uuid-here",
     "name": "test-run-1",
     "status": "completed",
+    "created_at": "2025-12-10T12:00:00Z",
+    "meta": {},
     "result": { "artifact": "uuid_result.json" }
   }
 ]
+```
 
-Tech Stack
-Backend
+### Test Script
 
-Python 3.12+
+```powershell
+# Install requests library
+pip install requests
 
-FastAPI (ASGI)
+# Run test
+python test_run.py
+```
 
-SQLAlchemy (async ORM)
+---
 
-aiosqlite
+## 🌐 API Endpoints
 
-asyncio
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| **POST** | `/api/runs/` | Create a new workflow run |
+| **GET** | `/api/runs/` | List all runs |
+| **GET** | `/api/runs/{id}` | Retrieve a specific run |
+| **GET** | `/api/monitoring/health` | Health check endpoint |
+| **WS** | `/api/ws/{run_id}` | Real-time event updates via WebSocket |
+| **GET** | `/api/artifacts/{artifact_id}` | Download artifact files |
 
-Pydantic v2
+### WebSocket Event Format
 
-WebSockets
+```json
+{
+  "event": "started|node_update|completed|failed|cancelled",
+  "run_id": "uuid",
+  "node": "parse",
+  "artifact": "artifact_id"
+}
+```
 
-Frontend
+---
 
-React (Vite)
+## 🛠️ Tech Stack
 
-TailwindCSS
+### Backend
 
-WebSocket live-stream console
+- **Python 3.12+**
+- **FastAPI** (ASGI web framework)
+- **SQLAlchemy** (Async ORM)
+- **aiosqlite** (Async SQLite driver)
+- **Pydantic v2** (Data validation)
+- **WebSockets** (Real-time streaming)
+- **asyncio** (Async task execution)
 
-Future Enhancements
+### Frontend
 
-User authentication (JWT / API keys)
+- **React 19**
+- **Vite** (Build tool)
+- **TailwindCSS** (Styling)
+- **WebSocket API** (Live updates)
 
-Distributed task queue (Redis + RQ/Celery)
+---
 
-Postgres support + Alembic migrations
+## 🗺️ Roadmap
 
-Workflow visual DAG editor
+- [ ] 🔐 User authentication (JWT / API keys)
+- [ ] 🔄 Distributed task queue (Redis + RQ/Celery)
+- [ ] 🐘 PostgreSQL support + Alembic migrations
+- [ ] 🎨 Workflow visual DAG editor
+- [ ] ☁️ S3-compatible artifact storage
+- [ ] 📈 Auto-scaling workers
+- [ ] 🐳 Docker & Docker Compose setup
+- [ ] ☸️ Kubernetes deployment configs
+- [ ] 📊 Monitoring & observability (Prometheus/Grafana)
+- [ ] 🧪 Comprehensive test suite
 
-S3-compatible artifact storage
+---
 
-Auto-scaling workers
+## 🤝 Contributing
 
-Author
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Rohit Ranjan Kumar
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## 👨‍💻 Author
+
+**Rohit Ranjan Kumar**
+
+- GitHub: [@OrydleAI](https://github.com/OrydleAI)
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if you find it helpful!**
+
+Made with ❤️ by [OrydleAI](https://github.com/OrydleAI)
+
+</div>
