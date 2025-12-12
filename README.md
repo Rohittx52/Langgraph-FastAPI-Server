@@ -51,18 +51,18 @@ This project recreates the **LangGraph server** behavior using FastAPI, deliveri
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffedce', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f4f4f4'}}}%%
 graph TD
     %% Define Nodes
-    Client[Client<br>Swagger / Frontend / curl]
+    Client["Client<br>Swagger / Frontend / curl"]
     
     subgraph API_Service ["API Service (FastAPI)"]
-        Router[FastAPI Router<br>POST /api/runs/]
-        Pydantic(Pydantic Validation)
-        Manager[Run Manager]
-        WS[WebSocket Endpoint<br>/api/ws/{run_id}]
+        Router["FastAPI Router<br>POST /api/runs/"]
+        Pydantic("Pydantic Validation")
+        Manager["Run Manager"]
+        WS["WebSocket Endpoint<br>/api/ws/{run_id}"]
     end
     
-    DB[(Database)]
-    Queue>Task Queue<br>(async worker)]
-    Artifacts[[Artifact Store<br>S3 / Blob Storage]]
+    DB[("Database")]
+    Queue>"Task Queue<br>(async worker)"]
+    Artifacts[["Artifact Store<br>S3 / Blob Storage"]]
 
     %% Main Request Flow
     Client -- 1. POST request --> Router
