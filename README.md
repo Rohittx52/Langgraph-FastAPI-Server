@@ -51,40 +51,35 @@ This project recreates the **LangGraph server** behavior using FastAPI, deliveri
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffedce', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f4f4f4'}}}%%
 graph TD
     %% Define Nodes
-    Client["Client<br>Swagger / Frontend / curl"]
-    
-    subgraph API_Service ["API Service (FastAPI)"]
-        Router["FastAPI Router<br>POST /api/runs/"]
-        Pydantic("Pydantic Validation")
-        Manager["Run Manager"]
-        WS["WebSocket Endpoint<br>/api/ws/{run_id}"]
+    Client[Client: Swagger / Frontend / curl]
+    DB[(Database)]
+    Queue[Task Queue: Async Worker]
+    Artifacts[Artifact Store: S3 / Blob]
+
+    %% Group API components
+    subgraph "API Service (FastAPI)"
+        Router[FastAPI Router: POST /api/runs/]
+        Pydantic[Pydantic Validation]
+        Manager[Run Manager]
+        WS[WebSocket Endpoint: /api/ws/run_id]
     end
-    
-    DB[("Database")]
-    Queue>"Task Queue<br>(async worker)"]
-    Artifacts[["Artifact Store<br>S3 / Blob Storage"]]
 
     %% Main Request Flow
-    Client -- 1. POST request --> Router
+    Client -->|"1. POST request"| Router
     Router --> Pydantic
-    Pydantic -- Validated --> Manager
-    Manager -- 2. Insert run record<br>(status=running) --> DB
-    Manager -- 3. Enqueue Job --> Queue
+    Pydantic -->|"Validated"| Manager
+    Manager -->|"2. Insert run (status=running)"| DB
+    Manager -->|"3. Enqueue Job"| Queue
 
     %% Async Execution Flow
-    Queue -- 4. Execute Workflow<br>& Emit Events --> WS
-    WS -.- 5. Stream Updates<br>(started → node_update → completed) .-> Client
+    Queue -->|"4. Execute Workflow & Emit Events"| WS
+    %% Dotted line for async stream feedback
+    WS -.->|"5. Stream Updates (start/update/complete)"| Client
 
     %% Completion Flow
-    Queue -- 6. Save result JSON --> Artifacts
-    Artifacts -.->|Link to artifact| Queue
-    Queue -- 7. Final Update<br>(status=completed, result link) --> DB
-
-    %% Styling
-    classDef storage fill:#e1edff,stroke:#4a7ebb,stroke-width:2px;
-    classDef async fill:#e8d4ff,stroke:#8a4abb,stroke-width:2px;
-    class DB,Artifacts storage;
-    class Queue,WS async;
+    Queue -->|"6. Save result JSON"| Artifacts
+    Artifacts -.->|"Artifact Link"| Queue
+    Queue -->|"7. Final Update (status=completed)"| DB
 ```
 
 ### Workflow Execution Flow
@@ -325,39 +320,6 @@ python test_run.py
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] 🔐 User authentication (JWT / API keys)
-- [ ] 🔄 Distributed task queue (Redis + RQ/Celery)
-- [ ] 🐘 PostgreSQL support + Alembic migrations
-- [ ] 🎨 Workflow visual DAG editor
-- [ ] ☁️ S3-compatible artifact storage
-- [ ] 📈 Auto-scaling workers
-- [ ] 🐳 Docker & Docker Compose setup
-- [ ] ☸️ Kubernetes deployment configs
-- [ ] 📊 Monitoring & observability (Prometheus/Grafana)
-- [ ] 🧪 Comprehensive test suite
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
 ## 👨‍💻 Author
 
 **Rohit Ranjan Kumar**
@@ -365,10 +327,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - GitHub: [@OrydleAI](https://github.com/OrydleAI)
 
 ---
-
-<div align="center">
-
-**⭐ Star this repo if you find it helpful!**
 
 Made with ❤️ by [OrydleAI](https://github.com/OrydleAI)
 
