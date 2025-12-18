@@ -1,7 +1,16 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.main import api_router
 from app.database import engine, Base
+# Import models to register them with Base.metadata
+import app.models
+
+# Load .env from project root
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(env_path)
 
 app = FastAPI(
     title="LangGraph-FastAPI Server",

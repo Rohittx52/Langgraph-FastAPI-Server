@@ -10,3 +10,4 @@ aiofiles
 aioredis       
 python-multipart    
 psycopg[binary]    
+google-generativeai

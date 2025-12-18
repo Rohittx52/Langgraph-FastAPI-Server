@@ -7,9 +7,9 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
-**A fully modular, production-ready FastAPI backend that replicates LangGraph server utilities**
+**A fully modular, production-ready FastAPI backend inspired by LangGraph server utilities**
 
-*Providing asynchronous workflow execution, real-time event streaming, persistent storage, and clean service-oriented architecture*
+*Provides asynchronous workflow execution, real-time streaming, persistent state, and a clean service-oriented architecture*
 
 [Features](#-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api-endpoints) • [Roadmap](#-roadmap)
 
@@ -19,94 +19,94 @@
 
 ## 📋 Overview
 
-This project recreates the **LangGraph server** behavior using FastAPI, delivering a cleaner architecture with a fully async execution pipeline. Built for advanced workflow orchestration, it serves as a backend foundation for:
+This project implements a **LangGraph-style execution server** using FastAPI. It is designed as a backend foundation for:
 
-- 🤖 **AI Agent Systems**
-- 🔄 **LangGraph-like Workflows**
-- ⚙️ **Automation Frameworks**
-- 🌐 **Distributed Pipelines**
+* 🤖 Agentic AI systems
+* 🔄 Graph-based workflows
+* 💬 Stateful chat + streaming systems
+* ⚙️ Async automation pipelines
+
+The system separates concerns cleanly across API, orchestration, persistence, and streaming layers while remaining lightweight and extensible.
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔄 **Async Workflow Execution** | Powered by custom in-memory task queue |
-| 📊 **Run Management** | Create, update, list, and track workflow runs |
-| 💾 **Persistent Artifacts** | Store workflow outputs as JSON/files |
-| 📍 **Checkpointing** | Save intermediate workflow steps |
-| 🗂️ **State Management** | Maintain workflow state throughout execution |
-| 🌐 **WebSocket Streaming** | Real-time event updates to dashboard |
-| 🗄️ **Async SQLAlchemy ORM** | SQLite + aiosqlite backend |
-| 🏗️ **Modular Architecture** | Clean separation: API → Services → Utils → Models |
+| Feature                     | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| 🔄 Async Workflow Execution | Background execution via asyncio task queue |
+| 📊 Run Management           | Create, track, list, and update runs        |
+| 💾 Persistent Artifacts     | JSON/file outputs saved per run             |
+| 📍 Checkpointing            | Intermediate execution snapshots            |
+| 🗂️ State Management        | Persisted workflow/chat state               |
+| 🌐 WebSocket Streaming      | Real-time status and token updates          |
+| 🧠 Chat Memory              | Threaded, stateful conversations            |
+| 🏗️ Modular Architecture    | API → Services → Utils → Models             |
 
 ---
 
 ## 🏛️ Architecture
 
-### System Architecture Diagram
+### High-Level System Architecture
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffedce', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f4f4f4'}}}%%
 graph TD
-    %% Define Nodes
-    Client[Client: Swagger / Frontend / curl]
+    Client[Client: Frontend / Swagger / curl]
     DB[(Database)]
-    Queue[Task Queue: Async Worker]
-    Artifacts[Artifact Store: S3 / Blob]
+    Queue[Async Task Queue]
+    Artifacts[Artifact Store]
 
-    %% Group API components
     subgraph "API Service (FastAPI)"
-        Router[FastAPI Router: POST /api/runs/]
+        Router[HTTP Router]
         Pydantic[Pydantic Validation]
-        Manager[Run Manager]
-        WS[WebSocket Endpoint: /api/ws/run_id]
+        Manager[Run / Chat Manager]
+        WS[WebSocket Server]
     end
 
-    %% Main Request Flow
-    Client -->|"1. POST request"| Router
+    Client -->|POST /api/runs or /api/chat| Router
     Router --> Pydantic
-    Pydantic -->|"Validated"| Manager
-    Manager -->|"2. Insert run (status=running)"| DB
-    Manager -->|"3. Enqueue Job"| Queue
+    Pydantic --> Manager
+    Manager -->|Persist state| DB
+    Manager -->|Schedule job| Queue
 
-    %% Async Execution Flow
-    Queue -->|"4. Execute Workflow & Emit Events"| WS
-    %% Dotted line for async stream feedback
-    WS -.->|"5. Stream Updates (start/update/complete)"| Client
+    Queue -->|Execute workflow / LLM| WS
+    WS -.->|Live stream events/tokens| Client
 
-    %% Completion Flow
-    Queue -->|"6. Save result JSON"| Artifacts
-    Artifacts -.->|"Artifact Link"| Queue
-    Queue -->|"7. Final Update (status=completed)"| DB
+    Queue -->|Save result| Artifacts
+    Queue -->|Final status update| DB
 ```
 
-### Workflow Execution Flow
+---
+
+### Workflow & Chat Execution Flow
 
 ```
-USER → Create Run (API)
-        │
-        ▼
-FastGraph Backend
-        │
-        ├─ 1. RunManager.create() → save run to DB
-        │
-        ├─ 2. TaskQueue.add_task() → schedule async workflow
-        │
-        ├─ 3. WS: broadcast "started"
-        │
-        ├─ 4. Workflow steps execute:
-        │        parse → analyze → save states/checkpoints
-        │
-        ├─ 5. ArtifactService.save() → result.json
-        │
-        ├─ 6. RunManager.update(status="completed")
-        │
-        └─ 7. WS: broadcast "completed"
-        │
-        ▼
-FRONTEND: Shows real-time logs, steps, result, artifacts
+USER ACTION
+   │
+   ▼
+HTTP API (FastAPI)
+   │
+   ├─ Validate request (Pydantic)
+   ├─ Persist state / message
+   ├─ Enqueue async job
+   │
+   ▼
+ASYNC TASK QUEUE
+   │
+   ├─ Execute workflow / LLM
+   ├─ Save checkpoints & state
+   ├─ Emit streaming events
+   │
+   ▼
+WEBSOCKET STREAM
+   │
+   ├─ started
+   ├─ token / node_update
+   ├─ completed
+   │
+   ▼
+FRONTEND UI
 ```
 
 ---
@@ -116,18 +116,25 @@ FRONTEND: Shows real-time logs, steps, result, artifacts
 ```
 langgraph-server/
 ├── app/
-│   ├── main.py                    # FastAPI initialization
-│   ├── database.py                # Async DB setup
+│   ├── main.py                    # FastAPI initialization + .env loader
+│   ├── database.py                # Async DB setup (SQLite + aiosqlite)
+│   ├── config.py                  # Configuration management
+│   ├── auth.py                    # Authentication utilities
+│   ├── init_db.py                 # Database initialization script
 │   │
 │   ├── api/
 │   │   ├── main.py                # Router aggregator
-│   │   ├── endpoints/
-│   │   │   ├── runs.py            # Run creation/listing
-│   │   │   └── ...
-│   │   └── stream.py              # WebSocket connections
+│   │   ├── runs.py                # Run streaming endpoints
+│   │   ├── stream.py              # WebSocket stream handler
+│   │   └── endpoints/
+│   │       └── chat.py            # Chat API (message history, send)
 │   │
 │   ├── models/
-│   │   └── run.py                 # SQLAlchemy ORM model
+│   │   ├── run.py                 # Run workflow model
+│   │   ├── chat.py                # Chat aggregate model
+│   │   ├── chat_message.py        # Individual chat messages
+│   │   ├── chat_thread.py         # Chat thread/conversation
+│   │   └── user_model.py          # User authentication model
 │   │
 │   ├── schemas/
 │   │   └── run.py                 # Pydantic validation models
@@ -135,68 +142,69 @@ langgraph-server/
 │   ├── services/
 │   │   ├── run_manager.py         # CRUD ops for runs
 │   │   ├── workflow_service.py    # Main workflow logic
+│   │   ├── chat_service.py        # Chat message processing + LLM streaming
+│   │   ├── chat_memory.py         # Chat history persistence
 │   │   ├── artifact_store.py      # Save result artifacts
 │   │   ├── checkpoint_store.py    # Save execution checkpoints
 │   │   └── state_services.py      # Maintain run state
 │   │
+│   ├── llm/
+│   │   ├── base.py                # Base LLM interface
+│   │   ├── mock.py                # Groq LLM implementation
+│   │   └── provider.py            # LLM provider singleton
+│   │
 │   ├── utils/
 │   │   ├── task_queue.py          # Async task queue
-│   │   ├── stream_manager.py      # Manage WebSocket clients
-│   │   └── logger.py              # Logging utilities
+│   │   ├── stream_manager.py      # WebSocket connection manager
+│   │   ├── logger.py              # Logging utilities
+│   │   ├── db.py                  # Database utilities
+│   │   └── redis_manager.py       # Redis connection manager
 │   │
 │   └── middleware/
 │       ├── logging.py             # Request logging
-│       └── rate_limit.py          # Optional rate limiting
+│       └── rate_limit.py          # Rate limiting middleware
 │
 ├── data/
 │   ├── fastgraph.db               # SQLite database
-│   ├── artifacts/                 # Final output files
+│   ├── artifacts/                 # Final output files (JSON results)
 │   ├── checkpoints/               # Execution snapshots
 │   └── states/                    # State store
 │
-├── frontend/                      # React dashboard (Vite + Tailwind)
-├── .env
-├── requirements.txt
-└── test_run.py
+├── frontend/                      # React 19 dashboard (Vite + Tailwind)
+│   ├── src/
+│   │   ├── App.jsx                # Main chat interface
+│   │   ├── App.css                # Custom styles
+│   │   └── main.jsx               # React entry point
+│   ├── package.json
+│   └── vite.config.js
+│
+├── .env                           # Environment variables (API keys)
+├── requirements.txt               # Python dependencies
+├── test_run.py                    # Workflow test script
+└── README.md
 ```
 
 ---
 
 ## 🚀 Installation
 
-### Prerequisites
-
-- **Python 3.12+**
-- **Node.js 18+** (for frontend)
-- **Git**
-
 ### Backend Setup
 
-```powershell
-# Clone the repository
+```bash
 git clone https://github.com/OrydleAI/Langgraph-FastAPI-Server.git
 cd Langgraph-FastAPI-Server/langgraph-server
 
-# Create virtual environment
 python -m venv venv
-venv\Scripts\activate     # Windows
-source venv/bin/activate  # Linux/Mac
+source venv/bin/activate  # Windows: venv\\Scripts\\activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Initialize database
 python -m app.init_db
-
-# Start FastAPI server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend Setup
 
-See [Frontend README](frontend/README.md) for detailed instructions.
-
-```powershell
+```bash
 cd frontend
 npm install
 npm run dev
@@ -206,125 +214,82 @@ npm run dev
 
 ## 📖 Usage
 
-### Access the Application
+| Service      | URL                                                      |
+| ------------ | -------------------------------------------------------- |
+| Frontend UI  | [http://localhost:5173](http://localhost:5173)           |
+| Swagger Docs | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| WebSocket    | ws://localhost:8000/api/ws/{thread_id}                   |
 
-| Service | URL |
-|---------|-----|
-| 🌐 **Frontend Dashboard** | http://localhost:5173 |
-| 📚 **API Swagger Docs** | http://127.0.0.1:8000/docs |
-| 📖 **API ReDoc** | http://127.0.0.1:8000/redoc |
-| ❤️ **Health Check** | http://127.0.0.1:8000/api/monitoring/health |
+### Create a Workflow Run
 
-### Example Workflow (End-to-End)
-
-#### 1️⃣ Create a Run
-
-**POST** `http://127.0.0.1:8000/api/runs/`
-
-```json
+```http
+POST /api/runs/
 {
-  "name": "test-run-1",
-  "payload": { "input": "Hello World" }
+  "name": "demo",
+  "payload": { "input": "Hello" }
 }
 ```
 
-**Response:**
+### Send Chat Message
 
-```json
+```http
+POST /api/chat/{thread_id}/message
 {
-  "run_id": "uuid-here"
+  "message": "Hello agent"
 }
-```
-
-#### 2️⃣ Backend Processing
-
-The backend automatically:
-
-1. ✅ Saves new run to database
-2. ⚡ Schedules workflow execution
-3. 📡 Streams events: `started` → `node_update` → `completed`
-4. 💾 Writes artifact to `/data/artifacts/`
-5. ✨ Updates run status to `completed`
-
-#### 3️⃣ Retrieve Runs
-
-**GET** `http://127.0.0.1:8000/api/runs/`
-
-```json
-[
-  {
-    "id": "uuid-here",
-    "name": "test-run-1",
-    "status": "completed",
-    "created_at": "2025-12-10T12:00:00Z",
-    "meta": {},
-    "result": { "artifact": "uuid_result.json" }
-  }
-]
-```
-
-### Test Script
-
-```powershell
-# Install requests library
-pip install requests
-
-# Run test
-python test_run.py
 ```
 
 ---
 
 ## 🌐 API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| **POST** | `/api/runs/` | Create a new workflow run |
-| **GET** | `/api/runs/` | List all runs |
-| **GET** | `/api/runs/{id}` | Retrieve a specific run |
-| **GET** | `/api/monitoring/health` | Health check endpoint |
-| **WS** | `/api/ws/{run_id}` | Real-time event updates via WebSocket |
-| **GET** | `/api/artifacts/{artifact_id}` | Download artifact files |
-
-### WebSocket Event Format
-
-```json
-{
-  "event": "started|node_update|completed|failed|cancelled",
-  "run_id": "uuid",
-  "node": "parse",
-  "artifact": "artifact_id"
-}
-```
+| Method | Endpoint                      | Description         |
+| ------ | ----------------------------- | ------------------- |
+| POST   | /api/runs/                    | Create workflow run |
+| GET    | /api/runs/                    | List runs           |
+| POST   | /api/chat/{thread_id}/message | Send chat message   |
+| GET    | /api/chat/{thread_id}/history | Chat history        |
+| WS     | /api/ws/{thread_id}           | Streaming updates   |
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Backend
+**Backend**
 
-- **Python 3.12+**
-- **FastAPI** (ASGI web framework)
-- **SQLAlchemy** (Async ORM)
-- **aiosqlite** (Async SQLite driver)
-- **Pydantic v2** (Data validation)
-- **WebSockets** (Real-time streaming)
-- **asyncio** (Async task execution)
+* Python 3.12+
+* FastAPI
+* SQLAlchemy (Async)
+* aiosqlite
+* Pydantic v2
+* asyncio + WebSockets
 
-### Frontend
+**Frontend**
 
-- **React 19**
-- **Vite** (Build tool)
-- **TailwindCSS** (Styling)
-- **WebSocket API** (Live updates)
+* React 19
+* Vite
+* TailwindCSS
+
+---
+
+## 🗺️ Roadmap
+
+* ✅ Async workflow execution
+* ✅ WebSocket streaming
+* ✅ Chat with LLM (Groq)
+* ✅ Persistent state & memory
+* 🔄 Tool calling & function execution
+* 🔄 Multi-agent orchestration
+* 🔄 Token-level streaming UI improvements
+* 🔄 Persistent queues (Redis/Celery)
+* 🔄 Auth & API keys
 
 ---
 
 ## 👨‍💻 Author
 
-**Rohit Ranjan Kumar**
-
-- GitHub: [@OrydleAI](https://github.com/OrydleAI)
+**Rohit Ranjan Kumar**  
+GitHub: [https://github.com/OrydleAI](https://github.com/OrydleAI)
 
 ---
 

@@ -1,19 +1,18 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.utils.stream_manager import stream_manager
+import asyncio
 
 router = APIRouter()
 
-@router.websocket("/{run_id}")
-async def ws_run(websocket: WebSocket, run_id: str):
-    await stream_manager.connect(run_id, websocket)
+@router.websocket("/{thread_id}")
+async def ws_run(websocket: WebSocket, thread_id: str):
+    await websocket.accept()   # ← REQUIRED
+    await stream_manager.connect(thread_id, websocket)
+
     try:
-        await websocket.send_json({"msg": f"connected to {run_id}"})
+        await websocket.send_json({"msg": f"connected to {thread_id}"})
         while True:
-            # keepalive or receive messages
-            try:
-                msg = await websocket.receive_text()
-                await websocket.send_json({"echo": msg})
-            except Exception:
-                await websocket.send_json({"type":"ping"})
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        await stream_manager.disconnect(run_id, websocket)
+        await stream_manager.disconnect(thread_id, websocket)
+

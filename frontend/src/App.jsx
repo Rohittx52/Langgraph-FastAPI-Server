@@ -1,284 +1,273 @@
 import React, { useEffect, useState, useRef } from "react";
-
-/**
- * FastGraph Dashboard - App.jsx
- * Replace your existing src/App.jsx with this file.
- * Assumes src/index.css contains the provided stylesheet and is imported in main.jsx.
- */
-
-function StatusBadge({ status }) {
-  const s = (status || "unknown").toLowerCase();
-  const cls = {
-    pending: "badge pending",
-    running: "badge running",
-    completed: "badge completed",
-    failed: "badge failed",
-  }[s] ?? "badge unknown";
-  return <span className={cls}>{(status || "UNKNOWN").toUpperCase()}</span>;
-}
+import "./App.css";
 
 export default function App() {
   const [runs, setRuns] = useState([]);
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [payloadText, setPayloadText] = useState('{ "input": "hello" }');
-  const [selectedRun, setSelectedRun] = useState(null);
-  const wsRef = useRef(null);
-  const eventsRef = useRef({}); // runId -> events array
   const [wsStatus, setWsStatus] = useState("disconnected");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const wsRef = useRef(null);
+  const bottomRef = useRef(null);
+
+  // Chat memory
+  const messagesRef = useRef({});          // thread_id -> [{role, content}]
+  const assistantBufferRef = useRef({});   // thread_id -> string
+
+  /* ----------------------------- EFFECTS ----------------------------- */
 
   useEffect(() => {
     fetchRuns();
-    const id = setInterval(fetchRuns, 5000);
+    const interval = setInterval(fetchRuns, 5000);
     return () => {
-      clearInterval(id);
-      if (wsRef.current) try { wsRef.current.close(); } catch(_) {}
+      clearInterval(interval);
+      // Cleanup WebSocket on unmount
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selectedRunId, messagesRef.current[selectedRunId]?.length]);
+
+  /* ----------------------------- API ----------------------------- */
+
   async function fetchRuns() {
-    setLoading(true);
     try {
       const res = await fetch("/api/runs/");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      // Ensure consistent shape and stable sort
-      const normalized = Array.isArray(data) ? data : [];
-      normalized.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-      setRuns(normalized);
-    } catch (err) {
-      console.error("fetchRuns:", err);
+      if (res.ok) {
+        const data = await res.json();
+        data.sort((a, b) =>
+          (b.created_at || "").localeCompare(a.created_at || "")
+        );
+        setRuns(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleSend(e) {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const userMessage = input;
+    setInput("");
+    setLoading(true);
+
+    // If no thread selected, create a new one
+    let threadId = selectedRunId;
+    if (!threadId) {
+      threadId = `thread-${Date.now()}`;
+      setSelectedRunId(threadId);
+      messagesRef.current[threadId] = [];
+      connectWs(threadId);
+    }
+
+    // Add user message to UI immediately
+    messagesRef.current[threadId].push({
+      role: "user",
+      content: userMessage,
+    });
+    assistantBufferRef.current[threadId] = "";
+    setRuns((r) => [...r]); // force re-render
+
+    try {
+      // Send message to chat API
+      await fetch(`/api/chat/${threadId}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage }),
+      });
+    } catch (e) {
+      console.error(e);
+      messagesRef.current[threadId].push({
+        role: "system",
+        content: "Error sending message: " + e.message,
+      });
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCreateRun(e) {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      let payload = {};
-      try { payload = JSON.parse(payloadText); } catch (parseErr) { payload = { raw: payloadText }; }
-      const body = { name: name || `run-${Date.now()}`, payload };
-      const res = await fetch("/api/runs/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `Create failed: ${res.status}`);
-      }
-      const data = await res.json();
-      // refresh runs & open created run
-      await fetchRuns();
-      if (data.run_id) {
-        openRun(data.run_id);
-      } else if (data.id) {
-        openRun(data.id);
-      }
-    } catch (err) {
-      console.error("createRun:", err);
-      alert("Failed to create run: " + (err.message || err));
-    } finally {
-      setCreating(false);
-    }
-  }
+  /* ----------------------------- WS ----------------------------- */
 
-  function openRun(runId) {
-    setSelectedRun(runId);
-    eventsRef.current[runId] = eventsRef.current[runId] || [];
-    attachWS(runId);
-  }
+  function selectRun(id) {
+    setSelectedRunId(id);
+    setMobileMenuOpen(false);
 
-  function attachWS(runId) {
-    // close previous socket (if different)
-    if (wsRef.current) {
-      try { wsRef.current.close(); } catch (_) {}
-      wsRef.current = null;
-      setWsStatus("disconnected");
+    if (!messagesRef.current[id]) {
+      messagesRef.current[id] = [];
+      assistantBufferRef.current[id] = "";
     }
 
-    const wsUrl = getWsUrl(`/api/ws/${runId}`);
+    connectWs(id);
+    
+    // Load chat history from backend
+    loadChatHistory(id);
+  }
+
+  async function loadChatHistory(threadId) {
     try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.addEventListener("open", () => {
-        setWsStatus("connected");
-        console.info("WS open", runId);
-      });
-
-      ws.addEventListener("message", (ev) => {
-        try {
-          const json = JSON.parse(ev.data);
-          eventsRef.current[runId] = eventsRef.current[runId] || [];
-          eventsRef.current[runId].push(json);
-          // keep runs list fresh if a status change/event indicates update
-          if (json.type === "completed" || json.type === "cancelled" || json.type === "failed" || json.type === "started" || json.type === "node_update") {
-            fetchRuns();
-          }
-          // Force minimal re-render
-          setRuns(r => [...r]);
-        } catch (e) {
-          console.log("ws message parse error:", e, ev.data);
-        }
-      });
-
-      ws.addEventListener("close", () => {
-        setWsStatus("disconnected");
-        console.info("WS closed", runId);
-      });
-
-      ws.addEventListener("error", (e) => {
-        setWsStatus("error");
-        console.error("WS error", e);
-      });
+      const res = await fetch(`/api/chat/${threadId}/history`);
+      if (res.ok) {
+        const history = await res.json();
+        messagesRef.current[threadId] = history;
+        setRuns((r) => [...r]); // force re-render
+      }
     } catch (e) {
-      console.error("attachWS error", e);
-      setWsStatus("error");
+      console.error("Error loading history:", e);
     }
   }
 
-  function getWsUrl(path) {
-    const p = window.location;
-    const protocol = p.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${p.host}${path}`;
+  function connectWs(threadId) {
+    if (wsRef.current) wsRef.current.close();
+
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/${threadId}`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => setWsStatus("connected");
+    ws.onclose = () => setWsStatus("disconnected");
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+
+      // Init buffers
+      if (!messagesRef.current[threadId]) {
+        messagesRef.current[threadId] = [];
+      }
+      if (!assistantBufferRef.current[threadId]) {
+        assistantBufferRef.current[threadId] = "";
+      }
+
+      // STREAMING TOKEN
+      if (msg.event === "token") {
+        assistantBufferRef.current[threadId] += msg.content;
+
+        const msgs = messagesRef.current[threadId];
+        const last = msgs[msgs.length - 1];
+
+        if (last?.role === "assistant" && last.streaming) {
+          last.content = assistantBufferRef.current[threadId];
+        } else {
+          msgs.push({
+            role: "assistant",
+            content: assistantBufferRef.current[threadId],
+            streaming: true,
+          });
+        }
+      }
+
+      // COMPLETION
+      if (msg.event === "completed") {
+        const msgs = messagesRef.current[threadId];
+        const last = msgs[msgs.length - 1];
+        if (last) last.streaming = false;
+        assistantBufferRef.current[threadId] = ""; // Reset buffer
+      }
+
+      // ERROR
+      if (msg.event === "error") {
+        messagesRef.current[threadId].push({
+          role: "system",
+          content: msg.error,
+        });
+      }
+
+      setRuns((r) => [...r]); // force re-render
+    };
   }
 
-  function humanTime(ts) {
-    if (!ts) return "-";
-    try { return new Date(ts).toLocaleString(); } catch { return ts; }
-  }
+  /* ----------------------------- RENDER ----------------------------- */
 
-  // events for selected run
-  const selectedEvents = (selectedRun && eventsRef.current[selectedRun]) ? eventsRef.current[selectedRun] : [];
+  const selectedRun = runs.find((r) => r.id === selectedRunId);
+  const messages = selectedRunId
+    ? messagesRef.current[selectedRunId] || []
+    : [];
 
   return (
-    <div className="app-container">
-      <div className="header">
-        <div>
-          <h1>FastGraph — Runs Dashboard</h1>
-          <div className="sub">API: <code>/api</code></div>
+    <div className="chat-layout">
+      {/* SIDEBAR */}
+      <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
+        <div className="sidebar-header">
+          <h1>FastGraph AI</h1>
         </div>
-        <div className="small">Socket: <strong style={{marginLeft:8}}>{wsStatus}</strong></div>
-      </div>
 
-      <div className="app-grid">
-        {/* LEFT: controls */}
-        <div className="card controls">
-          <h2 style={{margin:0, marginBottom:10}}>Create Run</h2>
-
-          <form onSubmit={handleCreateRun} className="col">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Run name (optional)"
-              className="input"
-            />
-            <textarea
-              value={payloadText}
-              onChange={(e) => setPayloadText(e.target.value)}
-              className="input"
-            />
-            <div style={{display:"flex", gap:10}}>
-              <button type="submit" className="btn" disabled={creating}>
-                {creating ? "Creating..." : "Create"}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => { setPayloadText('{ "input": "hello" }'); setName(""); }}
-              >
-                Reset
-              </button>
+        <div className="history-list">
+          {runs.map((run) => (
+            <div
+              key={run.id}
+              onClick={() => selectRun(run.id)}
+              className={`history-item ${
+                selectedRunId === run.id ? "active" : ""
+              }`}
+            >
+              <div className="history-title">
+                {run.name || "Untitled Chat"}
+              </div>
+              <div className="history-meta">
+                <span>{new Date(run.created_at).toLocaleDateString()}</span>
+                <span
+                  className={`dot ${
+                    run.status === "running" ? "animate" : ""
+                  }`}
+                />
+              </div>
             </div>
-          </form>
+          ))}
+        </div>
+      </aside>
 
-          <div className="helper" style={{marginTop:12}}>Click a run in the list to open live details and events.</div>
+      {/* CHAT */}
+      <main className="main-chat">
+        <div className="chat-header">
+          <h2>
+            {selectedRun ? selectedRun.name : "New Conversation"}
+          </h2>
+          <span className={`ws-status ${wsStatus === 'connected' ? 'connected' : ''}`}>
+            {selectedRun ? wsStatus : 'no thread'}
+          </span>
+        </div>
 
-          <hr style={{margin:"12px 0", border:"none", borderTop:"1px solid rgba(255,255,255,0.03)"}} />
-
-          <div>
-            <h3 style={{margin:"6px 0 10px 0"}}>Recent Runs</h3>
-            <div className="run-list">
-              {loading && <div className="small">Loading runs…</div>}
-              {(!loading && runs.length === 0) && <div className="small">No runs yet.</div>}
-              {runs.map((r) => (
-                <div
-                  key={r.id}
-                  className="run-item"
-                  style={{ borderColor: selectedRun === r.id ? "rgba(59,130,246,0.12)" : undefined, cursor: "pointer" }}
-                  onClick={() => openRun(r.id)}
-                >
-                  <div style={{flex:1}}>
-                    <div className="run-title">{r.name || r.id}</div>
-                    <div className="run-meta">
-                      <span style={{marginRight:8}}>{humanTime(r.created_at)}</span>
-                      <span style={{marginRight:8}}>•</span>
-                      <span className="small">meta: {JSON.stringify(r.run_meta || r.meta || {})}</span>
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <StatusBadge status={r.status} />
+        <div className="messages-scroll">
+          {!selectedRun ? (
+            <div className="empty-state">Start chatting 🚀</div>
+          ) : (
+            <>
+              {messages.map((m, i) => (
+                <div key={i} className={`message-row ${m.role}`}>
+                  <div className={`bubble ${m.role}`}>
+                    {m.content}
+                    {m.streaming && (
+                      <span className="cursor">▍</span>
+                    )}
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT: details */}
-        <div className="card">
-          <h2 style={{marginTop:0}}>Run Details & Events</h2>
-
-          {!selectedRun ? (
-            <div className="small">Select a run from the left to view events and details.</div>
-          ) : (
-            <div className="col">
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:12}}>
-                <div>
-                  <div style={{fontWeight:700}}>{runs.find(r => r.id === selectedRun)?.name || selectedRun}</div>
-                  <div className="small">ID: <code>{selectedRun}</code></div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <StatusBadge status={runs.find(r => r.id === selectedRun)?.status} />
-                </div>
-              </div>
-
-              <div style={{marginTop:12, display:"grid", gridTemplateColumns:"1fr 360px", gap:12}}>
-                <div className="console card" style={{padding:10}}>
-                  <div className="small" style={{marginBottom:8}}>Events ({selectedEvents.length})</div>
-                  {selectedEvents.length === 0 ? (
-                    <div className="small">Waiting for events…</div>
-                  ) : (
-                    selectedEvents.map((ev, i) => (
-                      <div key={i} className="line" style={{marginBottom:8}}>
-                        <div style={{fontSize:12, color:"var(--muted)", marginBottom:6}}>[{ev.type || "event"}] {ev.node ? ` ${ev.node}` : ""} • {ev.ts ? new Date(ev.ts).toLocaleTimeString() : ""}</div>
-                        <pre style={{whiteSpace:"pre-wrap", margin:0, fontSize:13, color:"var(--text)"}}>{JSON.stringify(ev, null, 2)}</pre>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="card" style={{padding:12}}>
-                  <div style={{fontWeight:700, marginBottom:8}}>Meta & Result</div>
-                  <div className="small"><strong>Meta:</strong> {JSON.stringify(runs.find(r => r.id === selectedRun)?.run_meta || runs.find(r => r.id === selectedRun)?.meta || {})}</div>
-                  <div className="small" style={{marginTop:8}}><strong>Result:</strong> {runs.find(r => r.id === selectedRun)?.result ? JSON.stringify(runs.find(r => r.id === selectedRun).result) : "-"}</div>
-                  {runs.find(r => r.id === selectedRun)?.result?.artifact && (
-                    <div style={{marginTop:12}}>
-                      <a className="btn" href={`/api/artifacts/${runs.find(r => r.id === selectedRun).result.artifact}`}>Download Artifact</a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+              <div ref={bottomRef} />
+            </>
           )}
-
-          <div className="app-footer">FastGraph Dashboard • connects to <code>/api</code></div>
         </div>
-      </div>
+
+        {/* INPUT */}
+        <form onSubmit={handleSend} className="chat-form">
+          <input
+            className="chat-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message…"
+          />
+          <button className="send-btn" disabled={loading}>
+            Send
+          </button>
+        </form>
+      </main>
     </div>
   );
 }

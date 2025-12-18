@@ -8,7 +8,6 @@ class StreamManager:
         self._lock = asyncio.Lock()
 
     async def connect(self, run_id: str, ws: WebSocket):
-        await ws.accept()
         async with self._lock:
             self._subs.setdefault(run_id, set()).add(ws)
 

@@ -3,9 +3,9 @@ from datetime import datetime
 from app.database import Base
 import uuid
 
-class User(Base):
-    __tablename__ = "users"
+class ChatThread(Base):
+    __tablename__ = "chat_threads"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String, unique=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    title = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
