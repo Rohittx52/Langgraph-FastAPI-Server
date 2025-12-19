@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -32,3 +32,24 @@ async def list_runs(db: AsyncSession = Depends(get_db)):
         }
         for r in runs
     ]
+
+@router.delete("/{run_id}")
+async def delete_run(run_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    await db.delete(run)
+    await db.commit()
+    return {"message": "Run deleted successfully"}
+
+@router.patch("/{run_id}")
+async def update_run(run_id: str, req: dict, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if "name" in req:
+        run.name = req["name"]
+    await db.commit()
+    return {"message": "Run updated successfully"}

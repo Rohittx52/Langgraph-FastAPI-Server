@@ -1,4 +1,6 @@
-# 🚀 LangGraph-FastAPI Server
+<img src="frontend/public/logo.png" alt="Orydle Logo" width="60" align="left" style="margin-right: 15px;" />
+
+# LangGraph-FastAPI Server
 
 <div align="center">
 
@@ -11,41 +13,41 @@
 
 *Provides asynchronous workflow execution, real-time streaming, persistent state, and a clean service-oriented architecture*
 
-[Features](#-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api-endpoints) • [Roadmap](#-roadmap)
+[Features](#features) • [Architecture](#architecture) • [Installation](#installation) • [Usage](#usage) • [API](#api-endpoints) • [Roadmap](#roadmap)
 
 </div>
 
 ---
 
-## 📋 Overview
+## Overview
 
 This project implements a **LangGraph-style execution server** using FastAPI. It is designed as a backend foundation for:
 
-* 🤖 Agentic AI systems
-* 🔄 Graph-based workflows
-* 💬 Stateful chat + streaming systems
-* ⚙️ Async automation pipelines
+* Agentic AI systems
+* Graph-based workflows
+* Stateful chat + streaming systems
+* Async automation pipelines
 
 The system separates concerns cleanly across API, orchestration, persistence, and streaming layers while remaining lightweight and extensible.
 
 ---
 
-## ✨ Features
+## Features
 
-| Feature                     | Description                                 |
-| --------------------------- | ------------------------------------------- |
-| 🔄 Async Workflow Execution | Background execution via asyncio task queue |
-| 📊 Run Management           | Create, track, list, and update runs        |
-| 💾 Persistent Artifacts     | JSON/file outputs saved per run             |
-| 📍 Checkpointing            | Intermediate execution snapshots            |
-| 🗂️ State Management        | Persisted workflow/chat state               |
-| 🌐 WebSocket Streaming      | Real-time status and token updates          |
-| 🧠 Chat Memory              | Threaded, stateful conversations            |
-| 🏗️ Modular Architecture    | API → Services → Utils → Models             |
+| Feature                  | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| Async Workflow Execution | Background execution via asyncio task queue |
+| Run Management           | Create, track, list, and update runs        |
+| Persistent Artifacts     | JSON/file outputs saved per run             |
+| Checkpointing            | Intermediate execution snapshots            |
+| State Management         | Persisted workflow/chat state               |
+| WebSocket Streaming      | Real-time status and token updates          |
+| Chat Memory              | Threaded, stateful conversations            |
+| Modular Architecture     | API → Services → Utils → Models             |
 
 ---
 
-## 🏛️ Architecture
+## Architecture
 
 ### High-Level System Architecture
 
@@ -111,7 +113,7 @@ FRONTEND UI
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 langgraph-server/
@@ -186,7 +188,7 @@ langgraph-server/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Backend Setup
 
@@ -212,7 +214,7 @@ npm run dev
 
 ---
 
-## 📖 Usage
+## Usage
 
 | Service      | URL                                                      |
 | ------------ | -------------------------------------------------------- |
@@ -241,7 +243,7 @@ POST /api/chat/{thread_id}/message
 
 ---
 
-## 🌐 API Endpoints
+## API Endpoints
 
 | Method | Endpoint                      | Description         |
 | ------ | ----------------------------- | ------------------- |
@@ -253,7 +255,7 @@ POST /api/chat/{thread_id}/message
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Backend**
 
@@ -272,27 +274,28 @@ POST /api/chat/{thread_id}/message
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-* ✅ Async workflow execution
-* ✅ WebSocket streaming
-* ✅ Chat with LLM (Groq)
-* ✅ Persistent state & memory
-* 🔄 Tool calling & function execution
-* 🔄 Multi-agent orchestration
-* 🔄 Token-level streaming UI improvements
-* 🔄 Persistent queues (Redis/Celery)
-* 🔄 Auth & API keys
+* Async workflow execution (Completed)
+* WebSocket streaming (Completed)
+* Chat with LLM (Groq) (Completed)
+* Persistent state & memory (Completed)
+* Tool calling & function execution (In Progress)
+* Multi-agent orchestration (In Progress)
+* Token-level streaming UI improvements (In Progress)
+* Persistent queues (Redis/Celery) (In Progress)
+* Auth & API keys (In Progress)
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Rohit Ranjan Kumar**  
-GitHub: [https://github.com/OrydleAI](https://github.com/OrydleAI)
+Contact: ranjanrohit908@gmail.com
+GitHub: https://github.com/Rohit1x52
 
 ---
 
-Made with ❤️ by [OrydleAI](https://github.com/OrydleAI)
+Made by [OrydleAI](https://github.com/OrydleAI)
 
 </div>

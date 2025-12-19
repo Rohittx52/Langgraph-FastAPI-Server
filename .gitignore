@@ -1,46 +1,93 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.pyo
 *.pyd
 *.so
+.Python
 *.egg
 *.egg-info/
-*.manifest
-*.spec
+dist/
+build/
+pip-wheel-metadata/
+
+# Virtual Environment
 venv/
 env/
 ENV/
 .venv/
+.virtualenv/
+
+# IDE & Editors
 .vscode/
 .idea/
 *.sublime-workspace
 *.sublime-project
+*.swp
+*.swo
+*~
+
+# Environment Variables
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/fastgraph.db
+
+# Data directories (keep structure but ignore content)
+data/artifacts/*
+data/checkpoints/*
+data/states/*
+!data/artifacts/.gitkeep
+!data/checkpoints/.gitkeep
+!data/states/.gitkeep
+
+# Logs
+*.log
+logs/
+*.pot
+*.mo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+*.cover
+.tox/
+.cache/
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.turbo/
+frontend/.next/
+frontend/out/
+
+# OS
 .DS_Store
 Thumbs.db
 desktop.ini
-*.log
-*.pot
-*.mo
-.cache/
-.pytest_cache/
-.mypy_cache/
-coverage/
-htmlcov/
-*.cover
-.env
-.env.*
-data/*.db
-data/checkpoints/
-data/states/
-data/artifacts/
-build/
-dist/
-*.egg-info/
-pip-wheel-metadata/
+
+# Misc
 *.tmp
 *.bak
-*.swp
-*.lock
-.ipynb_checkpoints/
 *.manifest
 *.spec

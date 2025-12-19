@@ -56,3 +56,27 @@ async def get_run(run_id: str, db: AsyncSession = Depends(get_db)):
         "meta": json.loads(run.run_meta) if isinstance(run.run_meta, str) else (run.run_meta or {}),
         "result": json.loads(run.result) if isinstance(run.result, str) else run.result
     }
+
+@router.delete("/{run_id}")
+async def delete_run(run_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a run by ID"""
+    result = await db.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    await db.delete(run)
+    await db.commit()
+    return {"message": "Run deleted successfully"}
+
+@router.patch("/{run_id}")
+async def update_run(run_id: str, req: dict, db: AsyncSession = Depends(get_db)):
+    """Update a run's name or other properties"""
+    result = await db.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if "name" in req:
+        run.name = req["name"]
+    await db.commit()
+    await db.refresh(run)
+    return {"message": "Run updated successfully", "run": {"id": run.id, "name": run.name}}
