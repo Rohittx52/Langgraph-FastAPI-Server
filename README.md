@@ -1,4 +1,4 @@
-<img src="frontend/public/logo.png" alt="Orydle Logo" width="60" align="left" style="margin-right: 15px;" />
+<img src="frontend/src/logo.png" alt="Orydle Logo" width="60" align="left" style="margin-right: 15px;" />
 
 # LangGraph-FastAPI Server
 
