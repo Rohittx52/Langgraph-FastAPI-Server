@@ -10,6 +10,12 @@ async def upload(run_id: str, file: UploadFile = File(...)):
     aid = artifact_service.save_bytes(run_id, file.filename, data)
     return {"artifact_id": aid}
 
+@router.get("/run/{run_id}")
+async def list_run_artifacts(run_id: str):
+    """List all artifacts for a specific run"""
+    artifacts = artifact_service.list_by_run(run_id)
+    return {"artifacts": artifacts}
+
 @router.get("/{artifact_id}")
 async def get_artifact(artifact_id: str):
     path = artifact_service.get_path(artifact_id)

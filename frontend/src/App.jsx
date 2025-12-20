@@ -9,6 +9,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [wsStatus, setWsStatus] = useState("disconnected");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [artifacts, setArtifacts] = useState([]);
   
   // Renaming State
   const [editingRunId, setEditingRunId] = useState(null);
@@ -107,10 +108,64 @@ export default function App() {
     }
   }
 
-  function selectRun(id) {
+  async function selectRun(id) {
     if (editingRunId) return;
     setSelectedRunId(id);
+    
+    // Load chat history from database if not already loaded
+    if (!messagesRef.current[id]) {
+      try {
+        const res = await fetch(`/api/chat/${id}/history`);
+        if (res.ok) {
+          const history = await res.json();
+          messagesRef.current[id] = history.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }));
+          setRuns(prev => [...prev]); // Trigger re-render
+        } else {
+          messagesRef.current[id] = [];
+        }
+      } catch (e) {
+        console.error("Failed to load chat history:", e);
+        messagesRef.current[id] = [];
+      }
+    }
+    
+    // Load artifacts for this run
+    loadArtifacts(id);
+    
     connectWs(id);
+  }
+
+  async function loadArtifacts(runId) {
+    try {
+      const res = await fetch(`/api/artifacts/run/${runId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setArtifacts(data.artifacts || []);
+      } else {
+        setArtifacts([]);
+      }
+    } catch (e) {
+      console.error("Failed to load artifacts:", e);
+      setArtifacts([]);
+    }
+  }
+
+  function downloadArtifact(artifactId, filename) {
+    const link = document.createElement('a');
+    link.href = `/api/artifacts/${artifactId}`;
+    link.download = filename;
+    link.click();
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   }
 
   async function deleteRun(e, id) {
@@ -120,6 +175,9 @@ export default function App() {
       const res = await fetch(`/api/runs/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setRuns(prev => prev.filter(r => r.id !== id));
+        // Clean up messages from memory
+        delete messagesRef.current[id];
+        delete assistantBufferRef.current[id];
         if (selectedRunId === id) setSelectedRunId(null);
       }
     } catch (err) { console.error(err); }
@@ -295,6 +353,51 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                
+                {selectedRun && artifacts.length > 0 && (
+                  <div className="message-row assistant">
+                    <div className="artifacts-container">
+                      <div className="artifacts-header">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                          <polyline points="13 2 13 9 20 9"></polyline>
+                        </svg>
+                        <span>Generated Files</span>
+                        <span className="artifacts-count">{artifacts.length}</span>
+                      </div>
+                      <div className="artifacts-grid">
+                        {artifacts.map((artifact) => (
+                          <div 
+                            key={artifact.artifact_id} 
+                            className="artifact-card"
+                            onClick={() => downloadArtifact(artifact.artifact_id, artifact.filename)}
+                          >
+                            <div className="artifact-icon">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                              </svg>
+                            </div>
+                            <div className="artifact-details">
+                              <span className="artifact-name">{artifact.filename}</span>
+                              <span className="artifact-size">{formatFileSize(artifact.size)}</span>
+                            </div>
+                            <div className="artifact-download-icon">
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                              </svg>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div ref={bottomRef} />
               </>
             )}
